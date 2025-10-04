@@ -1,71 +1,192 @@
-# OpenPermission.ts - Discord 역할 관리 봇
+# OpenPermission.ts - Discord Role Management Bot
 
-디스코드 유저에게 역할을 부여하거나 제거할 수 있는 봇입니다.
+A Discord bot for adding and removing roles from users.
 
-## 기능
+## Features
 
-- `/addrole` - 유저에게 역할 부여
-- `/removerole` - 유저의 역할 제거
+- `/addrole` - Add a role to a user
+- `/removerole` - Remove a role from a user
 
-## 설치 방법
+## Installation
 
-1. 의존성 설치:
+1. Install dependencies:
 ```bash
 npm install
 ```
 
-2. `.env` 파일 생성:
+2. Create `.env` file:
 ```bash
 cp .env.example .env
 ```
 
-3. `.env` 파일에 봇 정보 입력:
+3. Configure `.env` file with your bot credentials:
 ```env
 DISCORD_TOKEN=your_bot_token_here
 CLIENT_ID=your_client_id_here
 GUILD_ID=your_guild_id_here
 ```
 
-## Discord Bot 설정
+## Discord Bot Setup
 
-1. [Discord Developer Portal](https://discord.com/developers/applications)에 접속
-2. "New Application" 클릭하여 새 애플리케이션 생성
-3. "Bot" 탭에서 봇 생성
-4. "TOKEN" 복사 → `.env`의 `DISCORD_TOKEN`에 입력
-5. "OAuth2" → "General"에서 `CLIENT_ID` 복사 → `.env`에 입력
-6. "OAuth2" → "URL Generator"에서:
-   - Scopes: `bot`, `applications.commands` 선택
-   - Bot Permissions: `Manage Roles` 선택
-   - 생성된 URL로 봇을 서버에 초대
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Click "New Application" to create a new application
+3. Go to "Bot" tab and create a bot
+4. Copy the TOKEN → Add to `.env` as `DISCORD_TOKEN`
+5. Go to "OAuth2" → "General" and copy `CLIENT_ID` → Add to `.env`
+6. Go to "OAuth2" → "URL Generator":
+   - Scopes: Select `bot` and `applications.commands`
+   - Bot Permissions: Select `Manage Roles`
+   - Use the generated URL to invite the bot to your server
 
-7. 서버 ID 가져오기:
-   - Discord 설정에서 "고급" → "개발자 모드" 활성화
-   - 서버 우클릭 → "ID 복사" → `.env`의 `GUILD_ID`에 입력
+7. Get Server ID:
+   - Enable "Developer Mode" in Discord Settings → Advanced
+   - Right-click your server → "Copy ID" → Add to `.env` as `GUILD_ID`
 
-## 실행 방법
+## Running the Bot
 
-### 개발 모드
+### Development Mode
 ```bash
 npm run dev
 ```
 
-### 프로덕션
+### Production
 ```bash
 npm run build
 npm start
 ```
 
-## 사용 방법
+## Docker Deployment
 
-1. `/addrole @유저 @역할` - 유저에게 역할 부여
-2. `/removerole @유저 @역할` - 유저의 역할 제거
+### Local Docker
 
-## 필요 권한
+Build and run with Docker:
+```bash
+docker build -t openpermission-bot .
+docker run -d --env-file .env --name openpermission-bot openpermission-bot
+```
 
-- 봇 실행자: "역할 관리" 권한 필요
-- 봇: "역할 관리" 권한 필요 (관리하려는 역할보다 높은 위치에 있어야 함)
+Or use Docker Compose:
+```bash
+docker-compose up -d
+```
 
-## 주의사항
+### Google Cloud Build & Deploy
 
-- 봇의 역할이 관리하려는 역할보다 위에 있어야 합니다
-- 서버 소유자의 역할은 관리할 수 없습니다
+#### Prerequisites
+1. Install [Google Cloud SDK](https://cloud.google.com/sdk/docs/install)
+2. Create a GCP project
+3. Enable billing for your project
+
+#### Quick Deploy
+
+1. Make deploy script executable:
+```bash
+chmod +x deploy.sh
+```
+
+2. Set your GCP Project ID:
+```bash
+export GCP_PROJECT_ID="your-project-id"
+```
+
+3. Run deployment:
+```bash
+./deploy.sh
+```
+
+#### Manual Deployment
+
+1. **Enable Required APIs:**
+```bash
+gcloud services enable cloudbuild.googleapis.com
+gcloud services enable containerregistry.googleapis.com
+gcloud services enable run.googleapis.com
+```
+
+2. **Build with Cloud Build:**
+```bash
+gcloud builds submit --config cloudbuild.yaml .
+```
+
+3. **Deploy to Cloud Run (Optional):**
+```bash
+gcloud run deploy openpermission-bot \
+  --image gcr.io/YOUR_PROJECT_ID/openpermission-bot:latest \
+  --region us-central1 \
+  --platform managed \
+  --set-env-vars DISCORD_TOKEN=your_token,CLIENT_ID=your_client_id,GUILD_ID=your_guild_id
+```
+
+Or use **Google Secret Manager** for better security:
+```bash
+# Create secrets
+echo -n "your_discord_token" | gcloud secrets create discord-token --data-file=-
+echo -n "your_client_id" | gcloud secrets create client-id --data-file=-
+echo -n "your_guild_id" | gcloud secrets create guild-id --data-file=-
+
+# Deploy with secrets
+gcloud run deploy openpermission-bot \
+  --image gcr.io/YOUR_PROJECT_ID/openpermission-bot:latest \
+  --region us-central1 \
+  --platform managed \
+  --set-secrets DISCORD_TOKEN=discord-token:latest,CLIENT_ID=client-id:latest,GUILD_ID=guild-id:latest
+```
+
+4. **Deploy to GKE (Kubernetes):**
+```bash
+# Update kubernetes-deployment.yaml with your project ID and secrets
+kubectl apply -f kubernetes-deployment.yaml
+```
+
+## Usage
+
+1. `/addrole @user @role` - Add a role to a user
+2. `/removerole @user @role` - Remove a role from a user
+
+## Required Permissions
+
+- Command user: "Manage Roles" permission required
+- Bot: "Manage Roles" permission required (bot's role must be higher than target role)
+
+## Important Notes
+
+- The bot's role must be positioned higher than the roles it manages
+- Cannot manage server owner's roles
+- Bot runs continuously - suitable for Cloud Run, GKE, or Compute Engine
+
+## File Structure
+
+```
+.
+├── src/
+│   ├── index.ts              # Main bot file
+│   ├── commands.ts           # Slash command definitions
+│   └── handlers/
+│       └── roleHandler.ts    # Role management logic
+├── Dockerfile                # Docker container configuration
+├── cloudbuild.yaml          # Google Cloud Build configuration
+├── kubernetes-deployment.yaml # Kubernetes deployment config
+├── docker-compose.yml       # Docker Compose configuration
+├── deploy.sh                # Deployment script
+└── package.json             # Node.js dependencies
+```
+
+## Troubleshooting
+
+### Bot not responding
+- Check if bot is online in Discord
+- Verify slash commands are registered
+- Check bot permissions in server
+
+### Permission errors
+- Ensure bot role is higher than target role
+- Verify "Manage Roles" permission is granted
+
+### Cloud Run issues
+- Discord bots need to run continuously
+- Consider using GKE or Compute Engine instead
+- Cloud Run is better for HTTP services
+
+## License
+
+MIT
