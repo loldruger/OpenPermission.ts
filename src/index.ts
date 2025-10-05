@@ -3,6 +3,15 @@ import express from 'express';
 import { commands } from './commands';
 import { handleOpenCloseCommand } from './handlers/openCloseHandler';
 
+// 필수 환경 변수 확인
+const requiredEnvVars = ['DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID', 'OPEN_ROLE_ID'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`❌ Missing required environment variable: ${envVar}`);
+    process.exit(1); // 프로세스 종료
+  }
+}
+
 // Create HTTP server for Cloud Run health checks
 const app = express();
 const PORT = process.env.PORT || 8080;

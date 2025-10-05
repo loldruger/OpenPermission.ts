@@ -1,15 +1,7 @@
 import { ChatInputCommandInteraction, GuildMember } from 'discord.js';
 
 export async function handleOpenCloseCommand(interaction: ChatInputCommandInteraction) {
-  const roleId = process.env.OPEN_ROLE_ID;
-
-  if (!roleId) {
-    await interaction.reply({
-      content: '❌ OPEN_ROLE_ID is not configured. Please set it in environment variables.',
-      ephemeral: true,
-    });
-    return;
-  }
+  const roleId = process.env.OPEN_ROLE_ID!;
 
   // Get the role from guild
   const role = interaction.guild?.roles.cache.get(roleId);
@@ -23,9 +15,10 @@ export async function handleOpenCloseCommand(interaction: ChatInputCommandIntera
   }
 
   // Get the member who executed the command
-  const member = interaction.member as GuildMember;
+  const member = interaction.member;
 
-  if (!member) {
+  // member가 GuildMember의 인스턴스인지 확인
+  if (!(member instanceof GuildMember)) {
     await interaction.reply({
       content: '❌ Could not fetch member information.',
       ephemeral: true,
