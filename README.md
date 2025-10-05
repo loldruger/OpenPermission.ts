@@ -1,11 +1,13 @@
-# OpenPermission.ts - Discord Role Management Bot
+# OpenPermission.ts - Discord Self-Service Role Bot
 
-A Discord bot for adding and removing roles from users.
+A Discord bot that allows users to self-manage their availability status by adding or removing a configured role.
 
 ## Features
 
-- `/addrole` - Add a role to a user
-- `/removerole` - Remove a role from a user
+- `/open` - Mark yourself as available (adds configured role)
+- `/close` - Mark yourself as unavailable (removes configured role)
+
+Simple, self-service role management - no admin intervention needed!
 
 ## Installation
 
@@ -24,7 +26,13 @@ cp .env.example .env
 DISCORD_TOKEN=your_bot_token_here
 CLIENT_ID=your_client_id_here
 GUILD_ID=your_guild_id_here
+OPEN_ROLE_ID=your_role_id_here  # Role ID for /open and /close commands
 ```
+
+**Getting the Role ID:**
+1. Enable "Developer Mode" in Discord Settings → Advanced
+2. Right-click the role in Server Settings → Roles
+3. Click "Copy ID"
 
 ## Discord Bot Setup
 
@@ -76,83 +84,112 @@ docker-compose up -d
 1. Install [Google Cloud SDK](https://cloud.google.com/sdk/docs/install)
 2. Create a GCP project
 3. Enable billing for your project
+4. Authenticate: `gcloud auth login`
 
-#### Quick Deploy
+#### Deploy to Cloud Run (Updated - Now Supported!)
 
-1. Make deploy script executable:
-```bash
-chmod +x deploy.sh
-```
+**The bot now includes an HTTP server for Cloud Run compatibility.**
 
-2. Set your GCP Project ID:
+**Option 1: Using Secret Manager (Recommended for Production)**
+
+Most secure - stores credentials in Google Secret Manager:
+
 ```bash
 export GCP_PROJECT_ID="your-project-id"
+./deploy-secret-manager.sh
 ```
 
-3. Run deployment:
+The script will:
+- Enable Secret Manager API
+- Create encrypted secrets for all credentials
+- Grant Cloud Run access to secrets
+- Build and deploy with secret references
+
+**To update secrets later:**
 ```bash
-./deploy.sh
+./update-secrets.sh
 ```
 
-#### Manual Deployment
+See [SECRET_MANAGER_GUIDE.md](SECRET_MANAGER_GUIDE.md) for details.
 
-1. **Enable Required APIs:**
+**Option 2: Using Environment Variables**
+
+Simpler but less secure:
+
 ```bash
-gcloud services enable cloudbuild.googleapis.com
-gcloud services enable containerregistry.googleapis.com
-gcloud services enable run.googleapis.com
+export GCP_PROJECT_ID="your-project-id"
+./deploy-cloud-run.sh
 ```
 
-2. **Build with Cloud Build:**
+The script will:
+- Enable required APIs
+- Prompt for Discord credentials (Token, Client ID, Guild ID)
+- Build Docker image with Cloud Build
+- Deploy to Cloud Run with persistent instance (min-instances=1)
+
+**Note:** You'll need to set `OPEN_ROLE_ID` after deployment:
 ```bash
-gcloud builds submit --config cloudbuild.yaml .
+gcloud run services update openpermission-bot \
+  --region=us-central1 \
+  --update-env-vars OPEN_ROLE_ID=your_role_id
 ```
 
-3. **Deploy to Cloud Run (Optional):**
+**Cost**: ~$15-20/month (always-on instance)
+
+**Important**: The bot runs with `min-instances=1` to maintain the Discord WebSocket connection. This means the instance is always running.
+
+**To view logs:**
 ```bash
-gcloud run deploy openpermission-bot \
-  --image gcr.io/YOUR_PROJECT_ID/openpermission-bot:latest \
-  --region us-central1 \
-  --platform managed \
-  --set-env-vars DISCORD_TOKEN=your_token,CLIENT_ID=your_client_id,GUILD_ID=your_guild_id
+gcloud run services logs tail openpermission-bot --region=us-central1
 ```
 
-Or use **Google Secret Manager** for better security:
+**To update environment variables:**
 ```bash
-# Create secrets
-echo -n "your_discord_token" | gcloud secrets create discord-token --data-file=-
-echo -n "your_client_id" | gcloud secrets create client-id --data-file=-
-echo -n "your_guild_id" | gcloud secrets create guild-id --data-file=-
+# With Secret Manager (recommended)
+./update-secrets.sh
 
-# Deploy with secrets
-gcloud run deploy openpermission-bot \
-  --image gcr.io/YOUR_PROJECT_ID/openpermission-bot:latest \
-  --region us-central1 \
-  --platform managed \
-  --set-secrets DISCORD_TOKEN=discord-token:latest,CLIENT_ID=client-id:latest,GUILD_ID=guild-id:latest
+# With environment variables
+gcloud run services update openpermission-bot \
+  --region=us-central1 \
+  --set-env-vars DISCORD_TOKEN=new_token,CLIENT_ID=new_id,GUILD_ID=new_guild,OPEN_ROLE_ID=new_role
 ```
 
-4. **Deploy to GKE (Kubernetes):**
+**To delete the service:**
 ```bash
-# Update kubernetes-deployment.yaml with your project ID and secrets
-kubectl apply -f kubernetes-deployment.yaml
+gcloud run services delete openpermission-bot --region=us-central1
+```
+
+#### Alternative: Deploy to Compute Engine
+
+For lower cost (~$5-10/month or free tier):
+
+```bash
+export GCP_PROJECT_ID="your-project-id"
+./deploy-compute-engine.sh
 ```
 
 ## Usage
 
-1. `/addrole @user @role` - Add a role to a user
-2. `/removerole @user @role` - Remove a role from a user
+1. `/open` - Add the configured role to yourself (mark as available)
+2. `/close` - Remove the configured role from yourself (mark as unavailable)
+
+**Example Use Cases:**
+- Set `OPEN_ROLE_ID` to a role like "Available", "Open for DM", or "Active"
+- Users can toggle this role on/off themselves
+- No admin intervention required - fully self-service
 
 ## Required Permissions
 
-- Command user: "Manage Roles" permission required
-- Bot: "Manage Roles" permission required (bot's role must be higher than target role)
+- Bot: "Manage Roles" permission required
+- Bot's role must be higher than the configured OPEN_ROLE_ID in the role hierarchy
 
 ## Important Notes
 
-- The bot's role must be positioned higher than the roles it manages
-- Cannot manage server owner's roles
-- Bot runs continuously - suitable for Cloud Run, GKE, or Compute Engine
+- The bot's role must be positioned higher than the OPEN_ROLE_ID role
+- **Cloud Run**: Bot includes HTTP server on port 8080 for health checks
+- **Always-on**: Uses min-instances=1 to keep Discord connection alive
+- **Health Check**: Visit the service URL to see bot status
+- **Self-Service**: All users can use /open and /close without admin permissions
 
 ## File Structure
 
@@ -162,12 +199,11 @@ kubectl apply -f kubernetes-deployment.yaml
 │   ├── index.ts              # Main bot file
 │   ├── commands.ts           # Slash command definitions
 │   └── handlers/
-│       └── roleHandler.ts    # Role management logic
+│       └── openCloseHandler.ts # /open and /close logic
 ├── Dockerfile                # Docker container configuration
 ├── cloudbuild.yaml          # Google Cloud Build configuration
-├── kubernetes-deployment.yaml # Kubernetes deployment config
-├── docker-compose.yml       # Docker Compose configuration
-├── deploy.sh                # Deployment script
+├── deploy-secret-manager.sh # Deploy with Secret Manager
+├── deploy-cloud-run.sh      # Deploy with environment variables
 └── package.json             # Node.js dependencies
 ```
 
@@ -182,10 +218,21 @@ kubectl apply -f kubernetes-deployment.yaml
 - Ensure bot role is higher than target role
 - Verify "Manage Roles" permission is granted
 
-### Cloud Run issues
-- Discord bots need to run continuously
-- Consider using GKE or Compute Engine instead
-- Cloud Run is better for HTTP services
+### Cloud Deployment Issues
+
+#### Bot works but commands not responding
+- Wait a few minutes for slash commands to register
+- Try re-inviting the bot with the correct OAuth2 scopes
+- Check logs for registration errors
+
+#### "Container failed to start and listen on port" (Fixed!)
+The bot now includes an HTTP server that listens on PORT environment variable (default 8080).
+You can visit the service URL to see the bot status.
+
+#### High costs on Cloud Run
+- Cloud Run charges for CPU time when the instance is running
+- Consider using Compute Engine e2-micro (free tier eligible) for lower costs
+- Or run on your own server/Raspberry Pi for $0
 
 ## License
 

@@ -1,7 +1,7 @@
 {
   "name": "openpermission-bot",
   "version": "1.0.0",
-  "description": "Discord bot for managing user roles",
+  "description": "Discord bot for self-service role management with /open and /close commands",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -9,14 +9,20 @@
     "dev": "ts-node src/index.ts",
     "watch": "tsc -w"
   },
-  "keywords": ["discord", "bot", "roles"],
+  "keywords": [
+    "discord",
+    "bot",
+    "roles"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.1",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "express": "^5.1.0"
   },
   "devDependencies": {
+    "@types/express": "^4.17.23",
     "@types/node": "^20.10.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"

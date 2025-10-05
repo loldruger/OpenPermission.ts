@@ -1,9 +1,31 @@
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
+import express from 'express';
 import dotenv from 'dotenv';
 import { commands } from './commands';
-import { handleRoleCommand } from './handlers/roleHandler';
+import { handleOpenCloseCommand } from './handlers/openCloseHandler';
 
 dotenv.config();
+
+// Create HTTP server for Cloud Run health checks
+const app = express();
+const PORT = process.env.PORT || 8080;
+
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    bot: client.user?.tag || 'Not logged in',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy' });
+});
+
+app.listen(PORT, () => {
+  console.log(`HTTP server listening on port ${PORT}`);
+});
 
 const client = new Client({
   intents: [
@@ -23,8 +45,8 @@ client.on('interactionCreate', async (interaction) => {
 
   const { commandName } = interaction;
 
-  if (commandName === 'addrole' || commandName === 'removerole') {
-    await handleRoleCommand(interaction);
+  if (commandName === 'open' || commandName === 'close') {
+    await handleOpenCloseCommand(interaction);
   }
 });
 
