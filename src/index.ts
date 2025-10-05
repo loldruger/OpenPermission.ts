@@ -1,10 +1,7 @@
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import express from 'express';
-import dotenv from 'dotenv';
 import { commands } from './commands';
 import { handleOpenCloseCommand } from './handlers/openCloseHandler';
-
-dotenv.config();
 
 // Create HTTP server for Cloud Run health checks
 const app = express();
