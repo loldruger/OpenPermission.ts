@@ -1,7 +1,7 @@
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import express from 'express';
-import { commands } from './commands';
-import { handleOpenCloseCommand } from './handlers/openCloseHandler';
+import { commands } from './commands.js';
+import { handleOpenCloseCommand } from './handlers/openCloseHandler.js';
 
 // 필수 환경 변수 확인
 const requiredEnvVars = ['DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID', 'OPEN_ROLE_ID'];
@@ -51,7 +51,7 @@ client.on('interactionCreate', async (interaction) => {
 
   const { commandName } = interaction;
 
-  if (commandName === 'open' || commandName === 'close') {
+  if (commandName === 'enable' || commandName === 'disable') {
     await handleOpenCloseCommand(interaction);
   }
 });
